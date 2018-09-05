@@ -1,0 +1,1 @@
+This folder contains 3rd party libraries for compilation and linking. They are included merely for convenience, are not considered part of the project's own source code, and are subject to their individual licenses. They are unmodified from their original unless otherwise noted.
