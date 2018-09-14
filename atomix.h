@@ -55,7 +55,7 @@ atomix limits (non-SSE):
     Internally things are slightly different, as frames are now processed one-by-one instead of 4 at a time.
 */
 
-//include only once
+//header section
 #ifndef ATOMIX_H
 #define ATOMIX_H
 
@@ -122,8 +122,11 @@ ATMXDEF void atomixMixerHaltAll(struct atomix_mixer*);
 ATMXDEF void atomixMixerPlayAll(struct atomix_mixer*);
     //resumes all halted sounds in given mixer, no effect on looping or stopped sounds
 
+#endif //ATOMIX_H
+
 //implementation section
 #ifdef ATOMIX_IMPLEMENTATION
+#undef ATOMIX_IMPLEMENTATION
 
 //constants
 #ifndef ATOMIX_LBITS
@@ -893,4 +896,3 @@ static struct atmx_f2 atmxGainf2 (float gain, float pan) {
 }
 
 #endif //ATOMIX_IMPLEMENTATION
-#endif //ATOMIX_H
