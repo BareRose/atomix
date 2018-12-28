@@ -75,6 +75,8 @@ atomix limits (non-SSE):
 
 //includes
 #include <stdint.h> //integer types
+
+//structs
 struct atomix_mixer; //forward declaration
 struct atomix_sound; //forward declaration
 
@@ -128,13 +130,6 @@ ATMXDEF void atomixMixerPlayAll(struct atomix_mixer*);
 #ifdef ATOMIX_IMPLEMENTATION
 #undef ATOMIX_IMPLEMENTATION
 
-//constants
-#ifndef ATOMIX_LBITS
-    #define ATOMIX_LBITS 8
-#endif
-#define ATMX_LAYERS (1 << ATOMIX_LBITS)
-#define ATMX_LMASK (ATMX_LAYERS - 1)
-
 //macros
 #ifndef ATOMIX_ZALLOC
     #include <stdlib.h> //calloc
@@ -143,6 +138,13 @@ ATMXDEF void atomixMixerPlayAll(struct atomix_mixer*);
 #define ATMX_STORE(A, C) atomic_store_explicit(A, C, memory_order_release)
 #define ATMX_LOAD(A) atomic_load_explicit(A, memory_order_acquire)
 #define ATMX_CSWAP(A, E, C) atomic_compare_exchange_strong_explicit(A, E, C, memory_order_acq_rel, memory_order_acquire)
+
+//constants
+#ifndef ATOMIX_LBITS
+    #define ATOMIX_LBITS 8
+#endif
+#define ATMX_LAYERS (1 << ATOMIX_LBITS)
+#define ATMX_LMASK (ATMX_LAYERS - 1)
 
 //includes
 #ifndef ATOMIX_NO_SSE
