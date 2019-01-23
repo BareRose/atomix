@@ -150,7 +150,13 @@ ATMXDEF void atomixMixerPlayAll(struct atomix_mixer*);
 #ifndef ATOMIX_NO_SSE
     #include <xmmintrin.h> //SSE intrinsics
 #endif
-#include <stdatomic.h> //atomics
+#ifndef __cplusplus
+    #include <stdatomic.h> //atomics
+#else
+    using namespace std;
+    #include <atomic> //atomics
+    #define _Atomic(X) atomic<X>
+#endif
 #include <string.h> //memcpy
 
 //structs
@@ -168,16 +174,16 @@ struct atmx_f2 {
 };
 struct atmx_layer {
     uint32_t id; //playing id
-    _Atomic uint8_t flag; //state
-    _Atomic int32_t cursor; //cursor
-    _Atomic struct atmx_f2 gain; //gain
+    _Atomic(uint8_t) flag; //state
+    _Atomic(int32_t) cursor; //cursor
+    _Atomic(struct atmx_f2) gain; //gain
     struct atomix_sound* snd; //sound data
     int32_t start, end; //start and end
     int32_t fade, fmax; //fading
 };
 struct atomix_mixer {
     uint32_t nid; //next id
-    _Atomic float volume; //global volume
+    _Atomic(float) volume; //global volume
     struct atmx_layer lays[ATMX_LAYERS]; //layers
     int32_t fade; //global default fade value
     #ifndef ATOMIX_NO_SSE
@@ -210,9 +216,9 @@ ATMXDEF struct atomix_sound* atomixSoundNew (uint8_t cha, float* data, int32_t l
     int32_t rlen = (len + 3) & ~0x03;
     //allocate sound struct and space for data
     #ifndef ATOMIX_NO_SSE
-        struct atomix_sound* snd = ATOMIX_ZALLOC(sizeof(struct atomix_sound) + rlen*cha*sizeof(float) + 15);
+        struct atomix_sound* snd = (struct atomix_sound*)ATOMIX_ZALLOC(sizeof(struct atomix_sound) + rlen*cha*sizeof(float) + 15);
     #else
-        struct atomix_sound* snd = ATOMIX_ZALLOC(sizeof(struct atomix_sound) + rlen*cha*sizeof(float));
+        struct atomix_sound* snd = (struct atomix_sound*)ATOMIX_ZALLOC(sizeof(struct atomix_sound) + rlen*cha*sizeof(float));
     #endif
     //return if zalloc failed
     if (!snd) return NULL;
@@ -220,7 +226,7 @@ ATMXDEF struct atomix_sound* atomixSoundNew (uint8_t cha, float* data, int32_t l
     snd->cha = cha; snd->len = rlen;
     //align data pointer in allocated space if SSE
     #ifndef ATOMIX_NO_SSE
-        snd->data = (void*)(((uintptr_t)(void*)&snd[1] + 15) & ~15);
+        snd->data = (__m128*)(void*)(((uintptr_t)(void*)&snd[1] + 15) & ~15);
     #endif
     //copy sound data into now aligned buffer
     memcpy(snd->data, data, len*cha*sizeof(float));
@@ -233,7 +239,7 @@ ATMXDEF int32_t atomixSoundLength (struct atomix_sound* snd) {
 }
 ATMXDEF struct atomix_mixer* atomixMixerNew (float vol, int32_t fade) {
     //allocate space for the mixer filled with zero
-    struct atomix_mixer* mix = ATOMIX_ZALLOC(sizeof(struct atomix_mixer));
+    struct atomix_mixer* mix = (struct atomix_mixer*)ATOMIX_ZALLOC(sizeof(struct atomix_mixer));
     //return if zalloc failed
     if (!mix) return NULL;
     //atomically set the volume
@@ -387,7 +393,7 @@ ATMXDEF void atomixMixerStopAll (struct atomix_mixer* mix) {
         //pointer to this layer for cleaner code
         struct atmx_layer* lay = &mix->lays[i];
         //check if active and set to stop if true
-        if (ATMX_LOAD(&lay->flag) > 1) ATMX_STORE(&lay->flag, ATOMIX_STOP);
+        if (ATMX_LOAD(&lay->flag) > 1) ATMX_STORE(&lay->flag, (uint8_t)ATOMIX_STOP);
     }
 }
 ATMXDEF void atomixMixerHaltAll (struct atomix_mixer* mix) {
@@ -396,7 +402,7 @@ ATMXDEF void atomixMixerHaltAll (struct atomix_mixer* mix) {
         //pointer to this layer for cleaner code
         struct atmx_layer* lay = &mix->lays[i]; uint8_t flag;
         //check if playing or looping and try to swap
-        if ((flag = ATMX_LOAD(&lay->flag)) > 2) ATMX_CSWAP(&lay->flag, &flag, ATOMIX_HALT);
+        if ((flag = ATMX_LOAD(&lay->flag)) > 2) ATMX_CSWAP(&lay->flag, &flag, (uint8_t)ATOMIX_HALT);
     }
 }
 ATMXDEF void atomixMixerPlayAll (struct atomix_mixer* mix) {
@@ -405,7 +411,7 @@ ATMXDEF void atomixMixerPlayAll (struct atomix_mixer* mix) {
         //need to reset each time
         uint8_t flag = ATOMIX_HALT;
         //swap the flag to play if it is on halt
-        ATMX_CSWAP(&mix->lays[i].flag, &flag, ATOMIX_PLAY);
+        ATMX_CSWAP(&mix->lays[i].flag, &flag, (uint8_t)ATOMIX_PLAY);
     }
 }
 
@@ -430,7 +436,7 @@ static void atmxMixLayer (struct atmx_layer* lay, __m128 vol, __m128* align, uin
             else
                 cur = atmxMixFadeStereo(lay, cur, gmul, align, asize);
         //clear flag if ATOMIX_STOP and fully faded or at end
-        if ((flag == ATOMIX_STOP)&&((lay->fade == 0)||(cur == lay->end))) ATMX_STORE(&lay->flag, 0);
+        if ((flag == ATOMIX_STOP)&&((lay->fade == 0)||(cur == lay->end))) ATMX_STORE(&lay->flag, (uint8_t)0);
     } else {
         //ATOMIX_PLAY or ATOMIX_LOOP, play including fade in
         if (lay->snd->cha == 1)
@@ -438,7 +444,7 @@ static void atmxMixLayer (struct atmx_layer* lay, __m128 vol, __m128* align, uin
         else
             cur = atmxMixPlayStereo(lay, (flag == ATOMIX_LOOP), cur, gmul, align, asize);
         //clear flag if ATOMIX_PLAY and the cursor has reached the end
-        if ((flag == ATOMIX_PLAY)&&(cur == lay->end)) ATMX_CSWAP(&lay->flag, &flag, 0);
+        if ((flag == ATOMIX_PLAY)&&(cur == lay->end)) ATMX_CSWAP(&lay->flag, &flag, (uint8_t)0);
     }
 }
 static int32_t atmxMixFadeMono (struct atmx_layer* lay, int32_t cur, __m128 gmul, __m128* align, uint32_t asize) {
@@ -670,7 +676,7 @@ static void atmxMixLayer (struct atmx_layer* lay, float vol, float* buff, uint32
             else
                 cur = atmxMixFadeStereo(lay, cur, g, buff, fnum);
         //clear flag if ATOMIX_STOP and fully faded or at end
-        if ((flag == ATOMIX_STOP)&&((lay->fade == 0)||(cur == lay->end))) ATMX_STORE(&lay->flag, 0);
+        if ((flag == ATOMIX_STOP)&&((lay->fade == 0)||(cur == lay->end))) ATMX_STORE(&lay->flag, (uint8_t)0);
     } else {
         //ATOMIX_PLAY or ATOMIX_LOOP, play including fade in
         if (lay->snd->cha == 1)
@@ -678,7 +684,7 @@ static void atmxMixLayer (struct atmx_layer* lay, float vol, float* buff, uint32
         else
             cur = atmxMixPlayStereo(lay, (flag == ATOMIX_LOOP), cur, g, buff, fnum);
         //clear flag if ATOMIX_PLAY and the cursor has reached the end
-        if ((flag == ATOMIX_PLAY)&&(cur == lay->end)) ATMX_CSWAP(&lay->flag, &flag, 0);
+        if ((flag == ATOMIX_PLAY)&&(cur == lay->end)) ATMX_CSWAP(&lay->flag, &flag, (uint8_t)0);
     }
 }
 static int32_t atmxMixFadeMono (struct atmx_layer* lay, int32_t cur, struct atmx_f2 g, float* buff, uint32_t fnum) {
