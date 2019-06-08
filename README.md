@@ -12,6 +12,14 @@ The atomix library is a wait-free mixer making heavy use of stdatomic.h and SSE 
 - Pure mixer, allowing usage with the backend of your choice and mixing at any desired sampling rate
 - High performance, generally fast enough for real-time mixing at high sampling rates even without SSE
 
+## Future
+
+Possible future features include:
+
+- Automatic miniaudio integration, removing the need for a boilerplate callback function
+- Mechanism to allow more advanced layering, coordination, and timing of sounds
+- Proper 3D audio support, possibly with position interpolation and doppler
+
 ## Attribution
 
 You are not required to give attribution when using this library. If you want to give attribution anyway, either link to

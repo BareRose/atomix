@@ -20,14 +20,14 @@ If you find an error in this test or discover a possible improvement, please ope
 #define STB_VORBIS_IMPLEMENTATION
 #define STB_VORBIS_STATIC
 #include "libs/stb_vorbis.h"
-#define MINI_AL_IMPLEMENTATION
-#include "libs/mini_al.h"
+#define MA_IMPLEMENTATION
+#include "libs/miniaudio.h"
 #include <stdlib.h>
 #include <stdio.h>
 
-//send frames callback
-mal_uint32 sendFramesCallback (mal_device* dev, mal_uint32 fnum, void* buff) {
-    return atomixMixerMix(dev->pUserData, buff, fnum);
+//data callback
+void dataCallback (ma_device* dev, void* out, const void* inp, ma_uint32 fnum) {
+    atomixMixerMix(dev->pUserData, out, fnum);
 }
 
 //benchmarking
@@ -58,26 +58,26 @@ mal_uint32 sendFramesCallback (mal_device* dev, mal_uint32 fnum, void* buff) {
 //main function
 int main (int argc, char *argv[]) {
     //perpare variables
-    mal_device dev;
+    ma_device dev;
     float bench_buff[1024];
     void* fmus; void* fsnd;
-    mal_uint64 fmus_size, fsnd_size;
-    mal_decoder_config fmus_cfg, fsnd_cfg;
-    fmus_cfg = fsnd_cfg = mal_decoder_config_init(mal_format_f32, 0, MAL_SAMPLE_RATE_48000);
+    ma_uint64 fmus_size, fsnd_size;
+    ma_decoder_config fmus_cfg, fsnd_cfg;
+    fmus_cfg = fsnd_cfg = ma_decoder_config_init(ma_format_f32, 0, 48000);
     //initialize rand
     srand(getTime()*65536.0);
     //check arguments
     if (argc < 3) printf("Missing argument!\n");
-    else if (mal_decode_file(argv[1], &fmus_cfg, &fmus_size, &fmus) != MAL_SUCCESS)
+    else if (ma_decode_file(argv[1], &fmus_cfg, &fmus_size, &fmus) != MA_SUCCESS)
         printf("Music could not be loaded!\n");
-    else if (mal_decode_file(argv[2], &fsnd_cfg, &fsnd_size, &fsnd) != MAL_SUCCESS)
+    else if (ma_decode_file(argv[2], &fsnd_cfg, &fsnd_size, &fsnd) != MA_SUCCESS)
         printf("Sound could not be loaded!\n");
     else {
         //transfer audio data into atomix sounds and free temporary buffers
         struct atomix_sound* mus; struct atomix_sound* snd;
         mus = atomixSoundNew(fmus_cfg.channels, fmus, fmus_size);
         snd = atomixSoundNew(fsnd_cfg.channels, fsnd, fsnd_size);
-        mal_free(fmus); mal_free(fsnd);
+        ma_free(fmus); ma_free(fsnd);
         //create atomix mixer with volume of 0.5
         struct atomix_mixer* mix = atomixMixerNew(0.5f, 0);
         //begin benchmarking
@@ -100,16 +100,22 @@ int main (int argc, char *argv[]) {
         printf("One: %.0ff/s <- %.0ff/s (%.3fMiB/s)\n", 262144.0/(end-start), 262144.0/(end-start), 2.0/(end-start));
         //benchmarking done
         printf("<<BENCHMARK END>>\n");
-        //create mini_al playback device
-        mal_device_config cfg = mal_device_config_init_playback(mal_format_f32, 2, MAL_SAMPLE_RATE_48000, sendFramesCallback);
-        if (mal_device_init(NULL, mal_device_type_playback, NULL, &cfg, mix, &dev) != MAL_SUCCESS) {
+        //create miniaudio playback device
+        ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+        cfg.playback.pDeviceID = NULL;
+        cfg.playback.format = ma_format_f32;
+        cfg.playback.channels  = 2;
+        cfg.sampleRate = 48000;
+        cfg.dataCallback = dataCallback;
+        cfg.pUserData = mix;
+        if (ma_device_init(NULL, &cfg, &dev) != MA_SUCCESS) {
             //failed to initialize device
             printf("Failed to initialize device!\n");
             //return
             return 1;
         }
         //start playback device
-        mal_device_start(&dev);
+        ma_device_start(&dev);
         //set fade time to quarter of a second
         atomixMixerFade(mix, 12000);
         //begin demo of simple looping music and sound halting
@@ -135,7 +141,7 @@ int main (int argc, char *argv[]) {
         //sleep for 0.25 seconds
         psleep(0.25);
         //uninit playback device
-        mal_device_uninit(&dev);
+        ma_device_uninit(&dev);
         //free mixer and sounds
         free(mix); free(mus); free(snd);
     }
